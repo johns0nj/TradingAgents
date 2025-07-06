@@ -1,5 +1,9 @@
+from dotenv import load_dotenv
+import os
 from tradingagents.graph.trading_graph import TradingAgentsGraph
 from tradingagents.default_config import DEFAULT_CONFIG
+
+load_dotenv()  # 加载.env文件，自动注入环境变量
 
 # Create a custom config
 config = DEFAULT_CONFIG.copy()
