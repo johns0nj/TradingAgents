@@ -5,10 +5,12 @@ from pathlib import Path
 import json
 from datetime import date
 from typing import Dict, Any, Tuple, List, Optional
+from dotenv import load_dotenv
 
 from langchain_openai import ChatOpenAI
 from langchain_anthropic import ChatAnthropic
 from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_deepseek import ChatDeepSeek
 
 from langgraph.prebuilt import ToolNode
 
@@ -67,6 +69,11 @@ class TradingAgentsGraph:
         elif self.config["llm_provider"].lower() == "google":
             self.deep_thinking_llm = ChatGoogleGenerativeAI(model=self.config["deep_think_llm"])
             self.quick_thinking_llm = ChatGoogleGenerativeAI(model=self.config["quick_think_llm"])
+        elif self.config["llm_provider"].lower() == "deepseek":
+            load_dotenv()
+            deepseek_api_key = os.getenv("DEEPSEEK_API_KEY")
+            self.deep_thinking_llm = ChatDeepSeek(model=self.config["deep_think_llm"], api_key=deepseek_api_key)
+            self.quick_thinking_llm = ChatDeepSeek(model=self.config["quick_think_llm"], api_key=deepseek_api_key)
         else:
             raise ValueError(f"Unsupported LLM provider: {self.config['llm_provider']}")
         

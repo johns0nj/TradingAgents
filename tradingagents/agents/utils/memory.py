@@ -1,25 +1,56 @@
 import chromadb
 from chromadb.config import Settings
 from openai import OpenAI
+import os
+from dotenv import load_dotenv
+import re
 
+load_dotenv()
+
+def clean_text(text):
+    """清理文本中的特殊字符，避免编码问题"""
+    if not isinstance(text, str):
+        return str(text)
+    # 移除零宽空格和其他特殊字符
+    text = re.sub(r'[\u200b\u200c\u200d\u2060\u2061\u2062\u2063\u2064]', '', text)
+    # 移除其他可能导致编码问题的字符
+    text = text.encode('utf-8', errors='ignore').decode('utf-8')
+    return text
+
+# 暂时禁用 Deepseek embedding，因为 langchain_deepseek 包中没有 DeepSeekEmbeddings
+HAS_DEEPSEEK = False
 
 class FinancialSituationMemory:
     def __init__(self, name, config):
-        if config["backend_url"] == "http://localhost:11434/v1":
-            self.embedding = "nomic-embed-text"
-        else:
+        self.llm_provider = config.get("llm_provider", "openai").lower()
+        if self.llm_provider == "deepseek":
+            # Deepseek 暂时不支持 embedding，使用 OpenAI embedding 作为备选
+            print(clean_text("警告: Deepseek 暂不支持 embedding，使用 OpenAI embedding 作为备选"))
+            self.embedding_client = OpenAI(base_url=config.get("backend_url", "https://api.openai.com/v1"), api_key=os.getenv("OPENAI_API_KEY"))
             self.embedding = "text-embedding-3-small"
-        self.client = OpenAI(base_url=config["backend_url"])
+        else:
+            if config["backend_url"] == "http://localhost:11434/v1":
+                self.embedding = "nomic-embed-text"
+            else:
+                self.embedding = "text-embedding-3-small"
+            self.embedding_client = OpenAI(base_url=config["backend_url"], api_key=os.getenv("OPENAI_API_KEY"))
         self.chroma_client = chromadb.Client(Settings(allow_reset=True))
         self.situation_collection = self.chroma_client.create_collection(name=name)
 
     def get_embedding(self, text):
-        """Get OpenAI embedding for a text"""
-        
-        response = self.client.embeddings.create(
-            model=self.embedding, input=text
-        )
-        return response.data[0].embedding
+        """Get embedding for a text, auto switch provider"""
+        if self.llm_provider == "deepseek":
+            # 对于 Deepseek，使用 OpenAI embedding
+            response = self.embedding_client.embeddings.create(
+                model=self.embedding, input=text
+            )
+            return response.data[0].embedding
+        else:
+            # OpenAI embedding
+            response = self.embedding_client.embeddings.create(
+                model=self.embedding, input=text
+            )
+            return response.data[0].embedding
 
     def add_situations(self, situations_and_advice):
         """Add financial situations and their corresponding advice. Parameter is a list of tuples (situation, rec)"""
@@ -45,7 +76,7 @@ class FinancialSituationMemory:
         )
 
     def get_memories(self, current_situation, n_matches=1):
-        """Find matching recommendations using OpenAI embeddings"""
+        """Find matching recommendations using embeddings"""
         query_embedding = self.get_embedding(current_situation)
 
         results = self.situation_collection.query(

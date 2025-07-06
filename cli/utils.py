@@ -1,3 +1,5 @@
+import os
+from dotenv import load_dotenv
 import questionary
 from typing import List, Optional, Tuple, Dict
 
@@ -10,6 +12,8 @@ ANALYST_ORDER = [
     ("Fundamentals Analyst", AnalystType.FUNDAMENTALS),
 ]
 
+load_dotenv()
+deepseek_api_key = os.getenv("DEEPSEEK_API_KEY")
 
 def get_ticker() -> str:
     """Prompt the user to enter a ticker symbol."""
@@ -152,7 +156,11 @@ def select_shallow_thinking_agent(provider) -> str:
         "ollama": [
             ("llama3.1 local", "llama3.1"),
             ("llama3.2 local", "llama3.2"),
-        ]
+        ],
+        "deepseek": [
+            ("DeepSeek Chat - 快速推理", "deepseek-chat"),
+            ("DeepSeek V2 - 轻量级模型", "deepseek-v2"),
+        ],
     }
 
     choice = questionary.select(
@@ -214,7 +222,11 @@ def select_deep_thinking_agent(provider) -> str:
         "ollama": [
             ("llama3.1 local", "llama3.1"),
             ("qwen3", "qwen3"),
-        ]
+        ],
+        "deepseek": [
+            ("DeepSeek Chat - 深度推理", "deepseek-chat"),
+            ("DeepSeek V2 - 高级推理", "deepseek-v2"),
+        ],
     }
     
     choice = questionary.select(
@@ -247,7 +259,8 @@ def select_llm_provider() -> tuple[str, str]:
         ("Anthropic", "https://api.anthropic.com/"),
         ("Google", "https://generativelanguage.googleapis.com/v1"),
         ("Openrouter", "https://openrouter.ai/api/v1"),
-        ("Ollama", "http://localhost:11434/v1"),        
+        ("Ollama", "http://localhost:11434/v1"),
+        ("Deepseek (API Key from .env)", None),  # 新增Deepseek选项
     ]
     
     choice = questionary.select(
@@ -271,6 +284,11 @@ def select_llm_provider() -> tuple[str, str]:
         exit(1)
     
     display_name, url = choice
-    print(f"You selected: {display_name}\tURL: {url}")
+    print(f"You selected: {display_name}\tURL: {url if url else 'API Key from .env'}")
     
-    return display_name, url
+    # Deepseek特殊处理
+    if display_name.lower().startswith("deepseek"):
+        print("[提示] Deepseek API Key 将自动从.env文件读取，无需填写URL。请确保.env中有DEEPSEEK_API_KEY。")
+        return "deepseek", None
+    
+    return display_name.lower(), url
